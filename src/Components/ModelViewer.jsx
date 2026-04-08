@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 /* eslint-disable react/no-unknown-property */
+import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { Suspense, useRef, useLayoutEffect, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useLoader, useThree, invalidate } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useFBX, useProgress, Html, Environment, ContactShadows } from '@react-three/drei';
@@ -10,7 +11,7 @@ const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || na
 const deg2rad = d => (d * Math.PI) / 180;
 const DECIDE = 8;
 const ROTATE_SPEED = 0.005;
-const INERTIA = 0.925;
+const INERTIA = 0.90;
 const PARALLAX_MAG = 0.05;
 const PARALLAX_EASE = 0.12;
 const HOVER_MAG = deg2rad(6);
@@ -99,6 +100,10 @@ const ModelInner = ({
       if (o.isMesh) {
         o.castShadow = true;
         o.receiveShadow = true;
+        o.material.emissive = new THREE.Color("#ff4d00"); // 🔥 orange glow
+        o.material.emissiveIntensity = 0.8;
+        o.material.metalness = 0.6;
+        o.material.roughness = 0.25;
         if (fadeIn) {
           o.material.transparent = true;
           o.material.opacity = 0;
@@ -346,7 +351,7 @@ const ModelViewer = ({
   rimLightIntensity = 0.8,
   shadowColor = 'black',
   shadowOpacity = 0.35,
-  environmentPreset = 'forest',
+  environmentPreset = 'none',
   autoFrame = false,
   placeholderSrc,
   showScreenshotButton = true,
@@ -381,7 +386,7 @@ const ModelViewer = ({
       }
     });
     if (contactRef.current) contactRef.current.visible = false;
-    g.render(s, c);
+    rendererRef.current.render(sceneRef.current, cameraRef.current);
     const urlPNG = g.domElement.toDataURL('image/png');
     const a = document.createElement('a');
     a.download = 'model.png';
@@ -402,19 +407,15 @@ const ModelViewer = ({
         position: 'relative'
       }}
     >
-      {showScreenshotButton && (
-        <button
-          onClick={capture}
-          className="absolute top-4 right-4 z-10 cursor-pointer px-4 py-2 border border-white rounded-xl bg-transparent text-white hover:bg-white hover:text-black transition-colors"
-        >
-          Take Screenshot
-        </button>
-      )}
-
+     
       <Canvas
         shadows
         frameloop="demand"
-        gl={{ preserveDrawingBuffer: true }}
+        gl={{ preserveDrawingBuffer: true, alpha: true }}
+        style={{ 
+          background: "transparent",
+          touchAction: "pan-y pinch-zoom"
+        }}
         onCreated={({ gl, scene, camera }) => {
           rendererRef.current = gl;
           sceneRef.current = scene;
@@ -423,8 +424,15 @@ const ModelViewer = ({
           gl.outputColorSpace = THREE.SRGBColorSpace;
         }}
         camera={{ fov: cameraFov, position: [0, 0, camZ], near: 0.01, far: 100 }}
-        style={{ touchAction: 'pan-y pinch-zoom' }}
       >
+      <EffectComposer>
+        <Bloom
+            intensity={0.4}       // glow strength
+            luminanceThreshold={0.6}
+            luminanceSmoothing={0.2}
+        />
+      </EffectComposer>
+      
         {environmentPreset !== 'none' && <Environment preset={environmentPreset} background={false} />}
 
         <ambientLight intensity={ambientIntensity} />
